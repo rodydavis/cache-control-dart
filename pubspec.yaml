@@ -1,5 +1,5 @@
 name: cachecontrol
-description: A new Flutter package project.
+description: Dart only (no dependencies) package to parse and format HTTP Cache-Control header.
 version: 0.0.1
 repository: https://github.com/rodydavis/cache-control-dart
 
