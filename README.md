@@ -73,6 +73,12 @@ res.setHeader(
 );
 ```
 
+## Contributing
+
+Contributions are welcome. Please open up an issue or create PR if you would like to help out.
+
+Make sure to run `dart format` and `dart test` before submitting a PR.
+
 ## FAQ
 
 **Why another cache-control library?**
