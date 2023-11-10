@@ -1,6 +1,6 @@
 # cache-control
 
-> Format and parse HTTP Cache-Control header
+> Dart only (no dependencies) package to parse and format HTTP Cache-Control header.
 
 Based on the [TypeScript implementation](https://github.com/tusbar/cache-control) and ported to Dart.
 
