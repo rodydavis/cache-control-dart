@@ -4,6 +4,8 @@
 
 Based on the [TypeScript implementation](https://github.com/tusbar/cache-control) and ported to Dart.
 
+Helpful guide: https://shayy.org/posts/cache-control/
+
 ## Getting started
 
 ```bash
