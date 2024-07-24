@@ -1,10 +1,6 @@
 # cache-control
 
-> Dart only (no dependencies) package to parse and format HTTP Cache-Control header.
-
-Based on the [TypeScript implementation](https://github.com/tusbar/cache-control) and ported to Dart.
-
-Helpful guide: https://shayy.org/posts/cache-control/
+Dart only (no dependencies) package to parse and format HTTP Cache-Control header.
 
 ## Getting started
 
@@ -14,65 +10,24 @@ $ flutter pub add cachecontrol
 
 ## API
 
-This library exposes a `CacheControl` record, `parse()` method and extension method `format()`.
+HTTP requests can have a [Cache-Control](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control) header for both the request and response header.
 
-### `parse(header)`
-
-```dart
-import 'package:cachecontrol/cachecontrol.dart';
+```
+Cache-Control: max-age=604800, stale-if-error=86400
 ```
 
-`parse()` takes a `Cache-Control` HTTP header value and returns a `CacheControl` instance.
-
-For example, `parse('max-age=31536000, public')` will return [CacheControl] Dart record type:
+To parse request headers:
 
 ```dart
-CacheControl (
-  maxAge: 31536000,
-  sharedMaxAge: null,
-  maxStale: false,
-  maxStaleDuration: null,
-  minFresh: null,
-  immutable: false,
-  mustRevalidate: false,
-  noCache: false,
-  noStore: false,
-  noTransform: false,
-  onlyIfCached: false,
-  private: false,
-  proxyRevalidate: false,
-  public: true,
-  staleIfError: null,
-  staleWhileRevalidate: null
-);
+final headers = <String, String>{'Cache-Control': 'max-age=604800, stale-if-error=86400'}
+final cacheControl = RequestCacheControl.parse(headers['Cache-Control']!);
 ```
 
-### `cacheControl.format()`
+To parse response headers:
 
 ```dart
-import 'package:cachecontrol/cachecontrol.dart';
-```
-
-`format()` is a method on `CacheControl` (or similar object) and returns a `Cache-Control` HTTP header value.
-
-For example, `parse('').copyWith(maxAge: 31536000, public: true).format()` will return
-
-```dart
-max-age=31536000, public
-```
-
-## Example usage
-
-```dart
-res.setHeader(
-  "Cache-Control",
-  parse('')
-    .copyWith(
-      public: true,
-      immutable: true,
-    )
-   .format()
-);
+final headers = <String, String>{'Cache-Control': 'max-age=604800, stale-if-error=86400'}
+final cacheControl = ResponseCacheControl.parse(headers['Cache-Control']!);
 ```
 
 ## Contributing
@@ -91,3 +46,12 @@ None of the existing libraries focus on just parsing the `Cache-Control` headers
 
 - [`cachecontrol`](https://github.com/pquerna/cachecontrol): Golang HTTP Cache-Control Parser and Interpretation
 - [`cachecontrol`](https://github.com/tusbar/cache-control): TypeScript parser and formatter
+- https://shayy.org/posts/cache-control/
+- https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
+- https://developer.mozilla.org/en-US/docs/Web/HTTP/Caching
+- https://www.mnot.net/cache_docs/
+- https://jakearchibald.com/2016/caching-best-practices/
+- https://csswizardry.com/2019/03/cache-control-for-civilians/
+- https://httpwg.org/specs/rfc9111.html
+- https://httpwg.org/specs/rfc5861.html
+- https://httpwg.org/specs/rfc8246.html

@@ -1,246 +1,203 @@
 library cachecontrol;
 
-typedef CacheControl = ({
-  int? maxAge,
-  int? sharedMaxAge,
-  bool? maxStale,
-  int? maxStaleDuration,
-  int? minFresh,
-  bool? immutable,
-  bool? mustRevalidate,
-  bool? noCache,
-  bool? noStore,
-  bool? noTransform,
-  bool? onlyIfCached,
-  bool? private,
-  bool? proxyRevalidate,
-  bool? public,
-  int? staleWhileRevalidate,
-  int? staleIfError,
-});
+sealed class CacheControl {
+  final String _value;
+  const CacheControl(this._value);
 
-const _maxAge = 'max-age';
-const _sharedMaxAge = 's-maxage';
-const _maxStale = 'max-stale';
-const _minFresh = 'min-fresh';
-const _immutable = 'immutable';
-const _mustRevalidate = 'must-revalidate';
-const _noCache = 'no-cache';
-const _noStore = 'no-store';
-const _noTransform = 'no-transform';
-const _onlyIfCached = 'only-if-cached';
-const _private = 'private';
-const _proxyRevalidate = 'proxy-revalidate';
-const _public = 'public';
-const _staleWhileRevalidate = 'stale-while-revalidate';
-const _staleIfError = 'stale-if-error';
-
-const _regex = r'([a-zA-Z][a-zA-Z_-]*)\s*(?:=(?:"([^"]*)"|([^ \t",;]*)))?';
-
-bool parseBooleanOnly(Map<String, String?> values, String key) {
-  if (!values.containsKey(key)) {
-    return false;
-  }
-  return values[key] == null;
-}
-
-int? parseDuration(Map<String, String?> values, String key) {
-  if (!values.containsKey(key)) {
-    return null;
+  String get value {
+    return parts.map((e) => e.$2 == null ? e.$1 : '${e.$1}=${e.$2!}').join(',');
   }
 
-  final value = values[key];
-  if (value == null) {
-    return null;
+  Iterable<(String, String?)> get parts {
+    return _value.split(',').map((e) {
+      final p = e
+          .split('=')
+          .map((e) => e.trim())
+          .map((e) => e.toLowerCase())
+          .toList();
+      return (p.first, p.length > 1 ? p.last : null);
+    });
   }
 
-  final duration = int.tryParse(value, radix: 10);
-
-  if (duration == null || duration < 0) {
-    return null;
-  }
-
-  return duration;
-}
-
-CacheControl parse(String? header) {
-  if (header == null || header.trim().isEmpty) {
-    return (
-      maxAge: null,
-      sharedMaxAge: null,
-      maxStale: null,
-      maxStaleDuration: null,
-      minFresh: null,
-      immutable: null,
-      mustRevalidate: null,
-      noCache: null,
-      noStore: null,
-      noTransform: null,
-      onlyIfCached: null,
-      private: null,
-      proxyRevalidate: null,
-      public: null,
-      staleWhileRevalidate: null,
-      staleIfError: null,
+  int _getSeconds(String key, [bool allowBool = false]) {
+    final part = parts.firstWhere(
+      (e) => e.$1.toLowerCase() == key.toLowerCase(),
+      orElse: () => (key, null),
     );
+    final val = int.tryParse(part.$2 ?? '');
+    if (val != null) return val;
+    if (allowBool && _getBool(key)) return double.minPositive.toInt();
+    return 0;
   }
 
-  final values = <String, String?>{};
-  final headerRegex = RegExp(_regex);
-  final matches = headerRegex.allMatches(header);
-  for (final match in matches) {
-    final tokens = match.group(0)!.split('=');
-    final key = tokens[0];
-    values[key.toLowerCase()] = tokens.length > 1 ? tokens[1].trim() : null;
+  bool _getBool(String key) {
+    return parts.any((e) => e.$1.toLowerCase() == key.toLowerCase());
   }
-
-  final maxAge = parseDuration(values, _maxAge);
-  final sharedMaxAge = parseDuration(values, _sharedMaxAge);
-
-  var maxStale = parseBooleanOnly(values, _maxStale);
-  final maxStaleDuration = parseDuration(values, _maxStale);
-  if (maxStaleDuration != null && maxStaleDuration != 0) maxStale = true;
-
-  final minFresh = parseDuration(values, _minFresh);
-
-  final immutable = parseBooleanOnly(values, _immutable);
-  final mustRevalidate = parseBooleanOnly(values, _mustRevalidate);
-  final noCache = parseBooleanOnly(values, _noCache);
-  final noStore = parseBooleanOnly(values, _noStore);
-  final noTransform = parseBooleanOnly(values, _noTransform);
-  final onlyIfCached = parseBooleanOnly(values, _onlyIfCached);
-  final private = parseBooleanOnly(values, _private);
-  final proxyRevalidate = parseBooleanOnly(values, _proxyRevalidate);
-  final public = parseBooleanOnly(values, _public);
-  final staleWhileRevalidate = parseDuration(values, _staleWhileRevalidate);
-  final staleIfError = parseDuration(values, _staleIfError);
-
-  return (
-    maxAge: maxAge,
-    sharedMaxAge: sharedMaxAge,
-    maxStale: maxStale,
-    maxStaleDuration: maxStaleDuration,
-    minFresh: minFresh,
-    immutable: immutable,
-    mustRevalidate: mustRevalidate,
-    noCache: noCache,
-    noStore: noStore,
-    noTransform: noTransform,
-    onlyIfCached: onlyIfCached,
-    private: private,
-    proxyRevalidate: proxyRevalidate,
-    public: public,
-    staleWhileRevalidate: staleWhileRevalidate,
-    staleIfError: staleIfError,
-  );
 }
 
-extension CacheControlUtils on CacheControl {
-  String format() {
-    final tokens = <String>[];
+class RequestCacheControl extends CacheControl {
+  RequestCacheControl copyWith({
+    int? maxAge,
+    int? maxStale,
+    int? minFresh,
+    bool? noCache,
+    bool? noStore,
+    bool? noTransform,
+    bool? onlyIfCached,
+    int? staleIfError,
+  }) {
+    List<(String, String?)> parts = super.parts.toList();
 
-    if (this.maxAge != null) {
-      tokens.add('$_maxAge=${this.maxAge}');
-    }
-
-    if (this.sharedMaxAge != null) {
-      tokens.add('$_sharedMaxAge=${this.sharedMaxAge}');
-    }
-
-    if (this.maxStale == true) {
-      if (this.maxStaleDuration != null) {
-        tokens.add('$_maxStale=${this.maxStaleDuration}');
+    void setPart((String, String?) part, {bool remove = false}) {
+      if (remove) {
+        parts.removeWhere((e) => e.$1 == part.$1);
       } else {
-        tokens.add('$_maxStale');
+        final idx = parts.indexWhere((e) => e.$1 == part.$1);
+        if (idx != -1) {
+          parts[idx] = part;
+        } else {
+          parts.add(part);
+        }
       }
     }
 
-    if (this.minFresh != null) {
-      tokens.add('$_minFresh=${this.minFresh}');
+    if (maxAge != null) {
+      setPart(('max-age', '$maxAge'));
+    }
+    if (maxStale != null) {
+      setPart(('max-stale', '$maxStale'));
+    }
+    if (minFresh != null) {
+      setPart(('min-fresh', '$minFresh'));
+    }
+    if (noCache != null) {
+      setPart(('no-cache', null), remove: noCache == false);
+    }
+    if (noStore != null) {
+      setPart(('no-store', null), remove: noStore == false);
+    }
+    if (noTransform != null) {
+      setPart(('no-transform', null), remove: noTransform == false);
+    }
+    if (onlyIfCached != null) {
+      setPart(('only-if-cached', null), remove: onlyIfCached == false);
+    }
+    if (staleIfError != null) {
+      setPart(('stale-if-error', '$staleIfError'));
     }
 
-    if (this.immutable == true) {
-      tokens.add('$_immutable');
-    }
+    final result = parts
+        .map((e) => e.$2 == null ? e.$1 : '${e.$1.trim()}=${e.$2!.trim()}')
+        .map((e) => e.trim().toLowerCase())
+        .join(',');
 
-    if (this.mustRevalidate == true) {
-      tokens.add('$_mustRevalidate');
-    }
-
-    if (this.noCache == true) {
-      tokens.add('$_noCache');
-    }
-
-    if (this.noStore == true) {
-      tokens.add('$_noStore');
-    }
-
-    if (this.noTransform == true) {
-      tokens.add('$_noTransform');
-    }
-
-    if (this.onlyIfCached == true) {
-      tokens.add('$_onlyIfCached');
-    }
-
-    if (this.private == true) {
-      tokens.add('$_private');
-    }
-
-    if (this.proxyRevalidate == true) {
-      tokens.add('$_proxyRevalidate');
-    }
-
-    if (this.public == true) {
-      tokens.add('$_public');
-    }
-
-    if (this.staleWhileRevalidate != null) {
-      tokens.add('$_staleWhileRevalidate=${this.staleWhileRevalidate}');
-    }
-
-    if (this.staleIfError != null) {
-      tokens.add('$_staleIfError=${this.staleIfError}');
-    }
-
-    return tokens.join(', ');
+    return RequestCacheControl.parse(result);
   }
 
-  CacheControl copyWith({
+  const RequestCacheControl.parse(super.value);
+
+  int get maxAge => _getSeconds('max-age');
+  int get maxStale => _getSeconds('max-stale');
+  int get minFresh => _getSeconds('min-fresh');
+  bool get noCache => _getBool('no-cache');
+  bool get noStore => _getBool('no-store');
+  bool get noTransform => _getBool('no-transform');
+  bool get onlyIfCached => _getBool('only-if-cached');
+  int get staleIfError => _getSeconds('stale-if-error');
+}
+
+class ResponseCacheControl extends CacheControl {
+  ResponseCacheControl copyWith({
     int? maxAge,
     int? sharedMaxAge,
-    bool? maxStale,
-    int? maxStaleDuration,
-    int? minFresh,
     bool? immutable,
     bool? mustRevalidate,
     bool? noCache,
     bool? noStore,
     bool? noTransform,
-    bool? onlyIfCached,
     bool? private,
     bool? proxyRevalidate,
+    bool? mustUnderstand,
     bool? public,
-    int? staleWhileRevalidate,
     int? staleIfError,
+    int? staleWhileRevalidate,
   }) {
-    return (
-      maxAge: maxAge ?? this.maxAge,
-      sharedMaxAge: sharedMaxAge ?? this.sharedMaxAge,
-      maxStale: maxStale ?? this.maxStale,
-      maxStaleDuration: maxStaleDuration ?? this.maxStaleDuration,
-      minFresh: minFresh ?? this.minFresh,
-      immutable: immutable ?? this.immutable,
-      mustRevalidate: mustRevalidate ?? this.mustRevalidate,
-      noCache: noCache ?? this.noCache,
-      noStore: noStore ?? this.noStore,
-      noTransform: noTransform ?? this.noTransform,
-      onlyIfCached: onlyIfCached ?? this.onlyIfCached,
-      private: private ?? this.private,
-      proxyRevalidate: proxyRevalidate ?? this.proxyRevalidate,
-      public: public ?? this.public,
-      staleWhileRevalidate: staleWhileRevalidate ?? this.staleWhileRevalidate,
-      staleIfError: staleIfError ?? this.staleIfError,
-    );
+    List<(String, String?)> parts = super.parts.toList();
+
+    void setPart((String, String?) part, {bool remove = false}) {
+      if (remove) {
+        parts.removeWhere((e) => e.$1 == part.$1);
+      } else {
+        final idx = parts.indexWhere((e) => e.$1 == part.$1);
+        if (idx != -1) {
+          parts[idx] = part;
+        } else {
+          parts.add(part);
+        }
+      }
+    }
+
+    if (maxAge != null) {
+      setPart(('max-age', '$maxAge'));
+    }
+    if (sharedMaxAge != null) {
+      setPart(('s-maxage', '$sharedMaxAge'));
+    }
+    if (immutable != null) {
+      setPart(('immutable', null), remove: immutable == false);
+    }
+    if (mustRevalidate != null) {
+      setPart(('must-revalidate', null), remove: mustRevalidate == false);
+    }
+    if (noCache != null) {
+      setPart(('no-cache', null), remove: noCache == false);
+    }
+    if (noStore != null) {
+      setPart(('no-store', null), remove: noStore == false);
+    }
+    if (noTransform != null) {
+      setPart(('no-transform', null), remove: noTransform == false);
+    }
+    if (private != null) {
+      setPart(('private', null), remove: private == false);
+    }
+    if (proxyRevalidate != null) {
+      setPart(('proxy-revalidate', null), remove: proxyRevalidate == false);
+    }
+    if (mustUnderstand != null) {
+      setPart(('must-understand', null), remove: mustUnderstand == false);
+    }
+    if (public != null) {
+      setPart(('public', null), remove: public == false);
+    }
+    if (staleIfError != null) {
+      setPart(('stale-if-error', '$staleIfError'));
+    }
+    if (staleWhileRevalidate != null) {
+      setPart(('stale-while-revalidate', '$staleWhileRevalidate'));
+    }
+
+    final result = parts
+        .map((e) => e.$2 == null ? e.$1 : '${e.$1.trim()}=${e.$2!.trim()}')
+        .map((e) => e.trim().toLowerCase())
+        .join(',');
+
+    return ResponseCacheControl.parse(result);
   }
+
+  const ResponseCacheControl.parse(super.value);
+
+  int get maxAge => _getSeconds('max-age');
+  int get sharedMaxAge => _getSeconds('s-maxage');
+  bool get noCache => _getBool('no-cache');
+  bool get noStore => _getBool('no-store');
+  bool get noTransform => _getBool('no-transform');
+  bool get mustRevalidate => _getBool('must-revalidate');
+  bool get proxyRevalidate => _getBool('proxy-revalidate');
+  bool get mustUnderstand => _getBool('must-understand');
+  bool get private => _getBool('private');
+  bool get public => _getBool('public');
+  bool get immutable => _getBool('immutable');
+  int get staleWhileRevalidate => _getSeconds('stale-while-revalidate');
+  int get staleIfError => _getSeconds('stale-if-error');
 }
