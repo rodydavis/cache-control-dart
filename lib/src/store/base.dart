@@ -20,18 +20,18 @@ abstract class CacheStore<K, V> {
   /// [value]: The value of the item.
   /// [cacheControl]: The CacheControl policy associated with this item.
   /// [cachedDate]: The date and time when this item is being cached or validated.
-  void set(K key, V value, CacheControl cacheControl, DateTime cachedDate);
+  FutureOr<void> set(K key, V value, CacheControl cacheControl, DateTime cachedDate);
 
   /// Retrieves a cached item from the store.
   ///
   /// Returns the [CachedItem] if found, otherwise null.
-  CachedItem<V>? get(K key);
+  FutureOr<CachedItem<V>?> get(K key);
 
   /// Removes an item from the cache.
-  void remove(K key);
+  FutureOr<void> remove(K key);
 
   /// Clears all items from the cache.
-  void clear();
+  FutureOr<void> clear();
 
   /// Retrieves an item's value from the cache. If the item is missing or stale,
   /// it uses the [updateValueFactory] to generate a new value and its associated
@@ -53,5 +53,5 @@ abstract class CacheStore<K, V> {
   /// Removes all expired (stale) items from the cache.
   ///
   /// - [now]: The current DateTime, used to determine which items are stale.
-  void removeExpired(DateTime now);
+  FutureOr<void> removeExpired(DateTime now);
 }

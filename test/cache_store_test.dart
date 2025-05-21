@@ -15,47 +15,47 @@ void main() {
     });
 
     group('set and get', () {
-      test('should store and retrieve an item', () {
-        store.set(testKey, testValue, testPolicy, now);
-        final item = store.get(testKey);
+      test('should store and retrieve an item', () async {
+        await store.set(testKey, testValue, testPolicy, now);
+        final item = await store.get(testKey);
         expect(item, isNotNull);
         expect(item!.value, testValue);
         expect(item.cacheControl.maxAge, const Duration(seconds: 60));
         expect(item.cachedDate, now);
       });
 
-      test('set with no-store policy should not store the item', () {
-        store.set(testKey, testValue, noStorePolicy, now);
-        final item = store.get(testKey);
+      test('set with no-store policy should not store the item', () async {
+        await store.set(testKey, testValue, noStorePolicy, now);
+        final item = await store.get(testKey);
         expect(item, isNull);
       });
 
-      test('set with no-store should remove existing item', () {
-        store.set(testKey, testValue, testPolicy, now); // Store it first
-        var item = store.get(testKey);
+      test('set with no-store should remove existing item', () async {
+        await store.set(testKey, testValue, testPolicy, now); // Store it first
+        var item = await store.get(testKey);
         expect(item, isNotNull);
 
-        store.set(
+        await store.set(
             testKey, 'newValue', noStorePolicy, now); // Now set with no-store
-        item = store.get(testKey);
+        item = await store.get(testKey);
         expect(item, isNull);
       });
 
-      test('get should return null for non-existent key', () {
-        final item = store.get('nonExistentKey');
+      test('get should return null for non-existent key', () async {
+        final item = await store.get('nonExistentKey');
         expect(item, isNull);
       });
 
       test(
           'get should return null and remove item if it has no-store policy (safeguard)',
-          () {
+          () async {
         // Set an item initially that would be valid
-        store.set(testKey, testValue, testPolicy, now);
+        await store.set(testKey, testValue, testPolicy, now);
         // Directly manipulate the internal entries to simulate an item that was stored with no-store
         // This is to test the safeguard in the get() method.
         store.entries[testKey] = CachedItem(testValue, noStorePolicy, now);
 
-        final item = store.get(testKey);
+        final item = await store.get(testKey);
         expect(item, isNull,
             reason: "Item with no-store should be returned as null by get()");
         expect(store.entries.containsKey(testKey), isFalse,
@@ -64,25 +64,25 @@ void main() {
     });
 
     group('remove', () {
-      test('should remove an existing item', () {
-        store.set(testKey, testValue, testPolicy, now);
-        store.remove(testKey);
-        final item = store.get(testKey);
+      test('should remove an existing item', () async {
+        await store.set(testKey, testValue, testPolicy, now);
+        await store.remove(testKey);
+        final item = await store.get(testKey);
         expect(item, isNull);
       });
 
-      test('remove should do nothing for non-existent key', () {
-        expect(() => store.remove('nonExistentKey'), returnsNormally);
+      test('remove should do nothing for non-existent key', () async {
+        await store.remove('nonExistentKey');
       });
     });
 
     group('clear', () {
-      test('should remove all items from the store', () {
-        store.set('key1', 'value1', testPolicy, now);
-        store.set('key2', 'value2', testPolicy, now);
-        store.clear();
-        expect(store.get('key1'), isNull);
-        expect(store.get('key2'), isNull);
+      test('should remove all items from the store', () async {
+        await store.set('key1', 'value1', testPolicy, now);
+        await store.set('key2', 'value2', testPolicy, now);
+        await store.clear();
+        expect(await store.get('key1'), isNull);
+        expect(await store.get('key2'), isNull);
         expect(store.entries.isEmpty, isTrue);
       });
     });
@@ -108,7 +108,7 @@ void main() {
             await store.getOrUpdateValue(testKey, now, () => updateFactory());
 
         expect(result, factoryNewValue);
-        final item = store.get(testKey);
+        final item = await store.get(testKey);
         expect(item, isNotNull);
         expect(item!.value, factoryNewValue);
         expect(item.cacheControl.maxAge, factoryNewPolicy.maxAge);
@@ -122,13 +122,13 @@ void main() {
             testKey, now, () => updateFactory(policy: noStorePolicy));
 
         expect(result, factoryNewValue);
-        final item = store.get(testKey);
+        final item = await store.get(testKey);
         expect(item, isNull);
       });
 
       test('item in cache and fresh: factory NOT called, cached value returned',
           () async {
-        store.set(testKey, testValue, freshPolicy, now);
+        await store.set(testKey, testValue, freshPolicy, now);
         bool factoryCalled = false;
 
         final result = await store
@@ -144,7 +144,7 @@ void main() {
       test(
           'item in cache and stale: factory IS called, item updated, new value returned',
           () async {
-        store.set(
+        await store.set(
             testKey,
             testValue,
             stalePolicy,
@@ -159,7 +159,7 @@ void main() {
 
         expect(result, 'updatedViaFactory');
         expect(factoryCalled, isTrue);
-        final item = store.get(testKey);
+        final item = await store.get(testKey);
         expect(item, isNotNull);
         expect(item!.value, 'updatedViaFactory');
         expect(item.cacheControl.maxAge,
@@ -170,7 +170,7 @@ void main() {
       test(
           'item in cache and stale, factory returns no-store: factory called, item removed',
           () async {
-        store.set(testKey, testValue, stalePolicy,
+        await store.set(testKey, testValue, stalePolicy,
             now.subtract(const Duration(seconds: 1)));
         bool factoryCalled = false;
 
@@ -181,7 +181,7 @@ void main() {
 
         expect(result, factoryNewValue); // Factory value is returned
         expect(factoryCalled, isTrue);
-        final item = store.get(testKey); // Should be removed due to no-store
+        final item = await store.get(testKey); // Should be removed due to no-store
         expect(item, isNull);
       });
 
@@ -190,26 +190,15 @@ void main() {
         final syncFactoryPolicy = CacheControl()
           ..maxAge = const Duration(minutes: 5);
 
-        final result = store.getOrUpdateValue(testKey, now, () {
+        final result = await store.getOrUpdateValue(testKey, now, () {
           return (syncFactoryValue, syncFactoryPolicy);
         });
 
-        // Since the factory is sync, the result should also be sync if not already a Future
-        if (result is Future) {
-          final val = await result;
-
-          expect(val, syncFactoryValue);
-          final item = store.get(testKey);
-          expect(item, isNotNull);
-          expect(item!.value, syncFactoryValue);
-          expect(item.cacheControl.maxAge, syncFactoryPolicy.maxAge);
-        } else {
-          expect(result, syncFactoryValue);
-          final item = store.get(testKey);
-          expect(item, isNotNull);
-          expect(item!.value, syncFactoryValue);
-          expect(item.cacheControl.maxAge, syncFactoryPolicy.maxAge);
-        }
+        expect(result, syncFactoryValue);
+        final item = await store.get(testKey);
+        expect(item, isNotNull);
+        expect(item!.value, syncFactoryValue);
+        expect(item.cacheControl.maxAge, syncFactoryPolicy.maxAge);
       });
     });
   });

@@ -12,7 +12,7 @@ class InMemoryCacheStore<K, V> extends CacheStore<K, V> {
       {}; // Renamed from _entries and made visible for testing
 
   @override
-  void set(K key, V value, CacheControl cacheControl, DateTime cachedDate) {
+  FutureOr<void> set(K key, V value, CacheControl cacheControl, DateTime cachedDate) {
     void save() {
       entries[key] = CachedItem(value, cacheControl, cachedDate);
     }
@@ -28,7 +28,7 @@ class InMemoryCacheStore<K, V> extends CacheStore<K, V> {
   }
 
   @override
-  CachedItem<V>? get(K key) {
+  FutureOr<CachedItem<V>?> get(K key) {
     final item = entries[key];
     // Ensure that items with no-store are not returned as if they are cached.
     // They should ideally not be in entries if set was called with no-store=true.
@@ -41,17 +41,17 @@ class InMemoryCacheStore<K, V> extends CacheStore<K, V> {
   }
 
   @override
-  void remove(K key) {
+  FutureOr<void> remove(K key) {
     entries.remove(key);
   }
 
   @override
-  void clear() {
+  FutureOr<void> clear() {
     entries.clear();
   }
 
   @override
-  void removeExpired(DateTime now) {
+  FutureOr<void> removeExpired(DateTime now) {
     entries.removeWhere((key, item) {
       return item.cacheControl.isStale(item.cachedDate, now);
     });
@@ -63,13 +63,13 @@ class InMemoryCacheStore<K, V> extends CacheStore<K, V> {
     DateTime now,
     FutureOr<(V, CacheControl)> Function() updateValueFactory,
   ) async {
-    CachedItem<V>? cachedItem = get(key); // `get` now handles no-store check
+    CachedItem<V>? cachedItem = await get(key); // `get` now handles no-store check
 
     if (cachedItem == null) {
       // Item not in cache (or was no-store), fetch, store, and return
       final (V newValue, CacheControl newPolicy) = await updateValueFactory();
       // `set` will handle newPolicy.noStore
-      set(key, newValue, newPolicy, now);
+      await set(key, newValue, newPolicy, now);
       // If newPolicy.noStore was true, `set` would have removed it (or not stored it),
       // so we return the freshly generated value but it won't be cached as per its policy.
       return newValue;
@@ -81,7 +81,7 @@ class InMemoryCacheStore<K, V> extends CacheStore<K, V> {
         final (V newValue, CacheControl newPolicy) = await updateValueFactory();
         // Update the item in the store with the new value, new policy, and current time.
         // `set` will handle newPolicy.noStore
-        set(key, newValue, newPolicy, now);
+        await set(key, newValue, newPolicy, now);
         return newValue;
       } else {
         // Item is fresh, return its value

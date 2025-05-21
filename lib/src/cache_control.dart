@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'store/base.dart';
 
 /// A class for building and parsing `Cache-Control` HTTP headers.
@@ -631,18 +632,21 @@ class CacheControl {
   /// - [value]: The value of the item.
   /// - [policy]: The CacheControl policy to associate with this item.
   /// - [cachedDate]: The date and time when this item is being cached or validated.
-  static void writeToStore<K, V>(
+  static FutureOr<void> writeToStore<K, V>(
     CacheStore<K, V> store,
     K key,
     V value,
     CacheControl policy,
     DateTime cachedDate,
-  ) {
+  ) async {
     if (policy.noStore == true) {
       // Do not store if no-store directive is present.
+      // If the store might be async, ensure removal is also handled appropriately.
+      // For now, assuming remove is also FutureOr.
+      await store.remove(key);
       return;
     }
-    store.set(key, value, policy, cachedDate);
+    await store.set(key, value, policy, cachedDate);
   }
 
   /// Reads an item from the [CacheStore] if it's considered usable according to its policy.
@@ -657,13 +661,13 @@ class CacheControl {
   /// - [key]: The key of the item to retrieve.
   /// - [now]: The current date and time for freshness calculations.
   /// - [isErrorCondition]: Flag to indicate if an error condition exists (for `stale-if-error`).
-  static V? readFromStore<K, V>(
+  static FutureOr<V?> readFromStore<K, V>(
     CacheStore<K, V> store,
     K key,
     DateTime now,
     {bool isErrorCondition = false,}
-  ) {
-    final cachedItem = store.get(key);
+  ) async {
+    final cachedItem = await store.get(key);
 
     if (cachedItem == null) {
       return null;
@@ -706,12 +710,12 @@ class CacheControl {
   /// - [key]: The key of the item.
   /// - [now]: The current date and time for freshness calculations.
   /// Returns `true` if stale, `false` if fresh, `null` if not found or `no-store`.
-  static bool? isItemStaleInStore<K, V>(
+  static FutureOr<bool?> isItemStaleInStore<K, V>(
     CacheStore<K, V> store,
     K key,
     DateTime now,
-  ) {
-    final cachedItem = store.get(key);
+  ) async {
+    final cachedItem = await store.get(key);
     if (cachedItem == null || cachedItem.cacheControl.noStore == true) {
       return null;
     }
@@ -724,12 +728,12 @@ class CacheControl {
   /// - [key]: The key of the item.
   /// - [now]: The current date and time for freshness calculations.
   /// Returns `true` if revalidation is needed, `false` otherwise, `null` if not found or `no-store`.
-  static bool? needsItemUpdateInStore<K, V>(
+  static FutureOr<bool?> needsItemUpdateInStore<K, V>(
     CacheStore<K, V> store,
     K key,
     DateTime now,
-  ) {
-    final cachedItem = store.get(key);
+  ) async {
+    final cachedItem = await store.get(key);
     if (cachedItem == null || cachedItem.cacheControl.noStore == true) {
       return null;
     }
