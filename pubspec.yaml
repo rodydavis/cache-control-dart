@@ -1,6 +1,6 @@
 name: cachecontrol
 description: Dart only (no dependencies) package to parse and format HTTP Cache-Control header.
-version: 0.1.0+1
+version: 0.2.0
 repository: https://github.com/rodydavis/cache-control-dart
 
 environment:
@@ -9,4 +9,6 @@ environment:
 dev_dependencies:
   flutter_lints: ^2.0.0
   test: ^1.24.9
+dependencies:
+  meta: ^1.17.0
 

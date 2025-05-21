@@ -1,3 +1,8 @@
+## 0.2.0
+
+- Switch to a builder class
+- Add CacheStore class and implementation
+
 ## 0.1.0
 
 - Add RequestCacheControl/ResponseCacheControl classes
