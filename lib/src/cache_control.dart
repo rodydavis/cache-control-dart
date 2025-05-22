@@ -635,18 +635,16 @@ class CacheControl {
   static FutureOr<void> writeToStore<K, V>(
     CacheStore<K, V> store,
     K key,
-    V value,
-    CacheControl policy,
-    DateTime cachedDate,
+    CachedItem<V> value,
   ) async {
-    if (policy.noStore == true) {
+    if (value.cacheControl.noStore == true) {
       // Do not store if no-store directive is present.
       // If the store might be async, ensure removal is also handled appropriately.
       // For now, assuming remove is also FutureOr.
       await store.remove(key);
       return;
     }
-    await store.set(key, value, policy, cachedDate);
+    await store.set(key, value);
   }
 
   /// Reads an item from the [CacheStore] if it's considered usable according to its policy.
@@ -663,10 +661,11 @@ class CacheControl {
   /// - [isErrorCondition]: Flag to indicate if an error condition exists (for `stale-if-error`).
   static FutureOr<V?> readFromStore<K, V>(
     CacheStore<K, V> store,
-    K key,
-    DateTime now,
-    {bool isErrorCondition = false,}
-  ) async {
+    K key, {
+    DateTime? now,
+    bool isErrorCondition = false,
+  }) async {
+    now ??= DateTime.now();
     final cachedItem = await store.get(key);
 
     if (cachedItem == null) {
@@ -696,7 +695,8 @@ class CacheControl {
         // Caller should ideally trigger revalidation in the background.
         return cachedItem.value;
       }
-      if (isErrorCondition && itemPolicy.canServeStaleIfError(itemCachedDate, now)) {
+      if (isErrorCondition &&
+          itemPolicy.canServeStaleIfError(itemCachedDate, now)) {
         return cachedItem.value;
       }
       // Stale and cannot be served.
@@ -737,6 +737,7 @@ class CacheControl {
     if (cachedItem == null || cachedItem.cacheControl.noStore == true) {
       return null;
     }
-    return cachedItem.cacheControl.needsRevalidation(cachedItem.cachedDate, now);
+    return cachedItem.cacheControl
+        .needsRevalidation(cachedItem.cachedDate, now);
   }
 }

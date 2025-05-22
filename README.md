@@ -1,6 +1,6 @@
 # cache-control
 
-Dart only (no dependencies) package to parse and format HTTP Cache-Control header.
+Dart only (minimal dependencies) package to parse and format HTTP Cache-Control header.
 
 ## Getting started
 
