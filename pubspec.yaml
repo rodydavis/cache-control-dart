@@ -11,5 +11,5 @@ dev_dependencies:
   test: ^1.24.9
 dependencies:
   meta: ^1.17.0
-  http: ^1.4.0
+  collection: ^1.19.1
 

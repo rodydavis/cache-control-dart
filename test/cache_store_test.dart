@@ -16,7 +16,10 @@ void main() {
       DateTime? now,
     }) {
       return CachedItem<String>(
-          value ?? testValue, policy ?? testPolicy, now ?? DateTime.now());
+        value ?? testValue,
+        responseCacheControl: policy ?? testPolicy,
+        cachedDate: now ?? DateTime.now(),
+      );
     }
 
     setUp(() {
@@ -26,22 +29,22 @@ void main() {
     group('set and get', () {
       test('should store and retrieve an item', () async {
         await store.set(testKey, createItem(policy: testPolicy, now: now));
-        final item = await store.get(testKey);
+        final item = await store.peek(testKey);
         expect(item, isNotNull);
         expect(item!.value, testValue);
-        expect(item.cacheControl.maxAge, const Duration(seconds: 60));
+        expect(item.responseCacheControl.maxAge, const Duration(seconds: 60));
         expect(item.cachedDate, now);
       });
 
       test('set with no-store policy should not store the item', () async {
         await store.set(testKey, createItem(policy: noStorePolicy, now: now));
-        final item = await store.get(testKey);
+        final item = await store.peek(testKey);
         expect(item, isNull);
       });
 
       test('set with no-store should remove existing item', () async {
         await store.set(testKey, createItem(policy: testPolicy, now: now));
-        var item = await store.get(testKey);
+        var item = await store.peek(testKey);
         expect(item, isNotNull);
 
         await store.set(
@@ -51,12 +54,12 @@ void main() {
               value: 'newValue',
               now: now,
             ));
-        item = await store.get(testKey);
+        item = await store.peek(testKey);
         expect(item, isNull);
       });
 
       test('get should return null for non-existent key', () async {
-        final item = await store.get('nonExistentKey');
+        final item = await store.peek('nonExistentKey');
         expect(item, isNull);
       });
 
@@ -64,9 +67,13 @@ void main() {
           'get should return null and remove item if it has no-store policy (safeguard)',
           () async {
         await store.set(testKey, createItem(policy: testPolicy, now: now));
-        store.entries[testKey] = CachedItem(testValue, noStorePolicy, now);
+        store.entries[testKey] = CachedItem(
+          testValue,
+          responseCacheControl: noStorePolicy,
+          cachedDate: now,
+        );
 
-        final item = await store.get(testKey);
+        final item = await store.peek(testKey);
         expect(item, isNull,
             reason: "Item with no-store should be returned as null by get()");
         expect(store.entries.containsKey(testKey), isFalse,
@@ -78,7 +85,7 @@ void main() {
       test('should remove an existing item', () async {
         await store.set(testKey, createItem(now: now));
         await store.remove(testKey);
-        final item = await store.get(testKey);
+        final item = await store.peek(testKey);
         expect(item, isNull);
       });
 
@@ -94,8 +101,8 @@ void main() {
         await store.set(
             'key2', createItem(value: 'value2', policy: testPolicy, now: now));
         await store.clear();
-        expect(await store.get('key1'), isNull);
-        expect(await store.get('key2'), isNull);
+        expect(await store.peek('key1'), isNull);
+        expect(await store.peek('key2'), isNull);
         expect(store.entries.isEmpty, isTrue);
       });
     });
@@ -113,7 +120,11 @@ void main() {
         required DateTime dateTime,
       }) async {
         await Future.delayed(Duration.zero);
-        return CachedItem(value, policy ?? factoryNewPolicy, dateTime);
+        return CachedItem(
+          value,
+          responseCacheControl: policy ?? factoryNewPolicy,
+          cachedDate: dateTime,
+        );
       }
 
       test(
@@ -128,10 +139,10 @@ void main() {
             .last;
 
         expect(result, factoryNewValue);
-        final item = await store.get(testKey);
+        final item = await store.peek(testKey);
         expect(item, isNotNull);
         expect(item!.value, factoryNewValue);
-        expect(item.cacheControl.maxAge, factoryNewPolicy.maxAge);
+        expect(item.responseCacheControl.maxAge, factoryNewPolicy.maxAge);
         expect(item.cachedDate, now);
       });
 
@@ -147,15 +158,17 @@ void main() {
             .last;
 
         expect(result, factoryNewValue);
-        final item = await store.get(testKey);
+        final item = await store.peek(testKey);
         expect(item, isNull);
       });
 
       test('item in cache and fresh: factory NOT called, cached value returned',
           () async {
         final itemNow = now.subtract(const Duration(seconds: 1));
-        await store.set(testKey,
-            createItem(value: testValue, policy: freshPolicy, now: itemNow));
+        await store.set(
+          testKey,
+          createItem(value: testValue, policy: freshPolicy, now: itemNow),
+        );
         bool factoryCalled = false;
 
         final result = await store.fetch(testKey, () {
@@ -185,10 +198,10 @@ void main() {
 
         expect(result, 'updatedViaFactory');
         expect(factoryCalled, isTrue);
-        final item = await store.get(testKey);
+        final item = await store.peek(testKey);
         expect(item, isNotNull);
         expect(item!.value, 'updatedViaFactory');
-        expect(item.cacheControl.maxAge, factoryNewPolicy.maxAge);
+        expect(item.responseCacheControl.maxAge, factoryNewPolicy.maxAge);
         expect(item.cachedDate, callTime);
       });
 
@@ -212,7 +225,7 @@ void main() {
 
         expect(result, factoryNewValue);
         expect(factoryCalled, isTrue);
-        final item = await store.get(testKey);
+        final item = await store.peek(testKey);
         expect(item, isNull);
       });
 
@@ -223,14 +236,18 @@ void main() {
         final callTime = now;
 
         final result = await store.fetch(testKey, () {
-          return CachedItem(syncFactoryValue, syncFactoryPolicy, callTime);
+          return CachedItem(
+            syncFactoryValue,
+            responseCacheControl: syncFactoryPolicy,
+            cachedDate: callTime,
+          );
         }, callTime).last;
 
         expect(result, syncFactoryValue);
-        final item = await store.get(testKey);
+        final item = await store.peek(testKey);
         expect(item, isNotNull);
         expect(item!.value, syncFactoryValue);
-        expect(item.cacheControl.maxAge, syncFactoryPolicy.maxAge);
+        expect(item.responseCacheControl.maxAge, syncFactoryPolicy.maxAge);
       });
     });
   });

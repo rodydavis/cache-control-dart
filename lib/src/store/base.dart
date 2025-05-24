@@ -2,14 +2,39 @@ import 'dart:async';
 
 import '../cache_control.dart';
 
-/// Represents an item stored in the cache, including its value,
-/// the CacheControl policy it was stored with, and the date it was cached.
 class CachedItem<V> {
   V value;
-  CacheControl cacheControl;
+  CacheControl requestCacheControl;
+  CacheControl responseCacheControl;
   DateTime cachedDate;
 
-  CachedItem(this.value, this.cacheControl, this.cachedDate);
+  CachedItem(
+    this.value, {
+    DateTime? cachedDate,
+    CacheControl? requestCacheControl,
+    CacheControl? responseCacheControl,
+  })  : requestCacheControl = requestCacheControl ?? CacheControl(),
+        responseCacheControl = responseCacheControl ?? CacheControl(),
+        cachedDate = cachedDate ?? DateTime.now();
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    return other is CachedItem &&
+        other.value == value &&
+        other.requestCacheControl == requestCacheControl &&
+        other.responseCacheControl == responseCacheControl &&
+        other.cachedDate == cachedDate;
+  }
+
+  @override
+  int get hashCode {
+    return value.hashCode ^
+        requestCacheControl.hashCode ^
+        responseCacheControl.hashCode ^
+        cachedDate.hashCode;
+  }
 }
 
 /// Abstract interface for a cache store.
@@ -27,7 +52,7 @@ abstract class CacheStore<K, V> {
   /// Retrieves a cached item from the store.
   ///
   /// Returns the [CachedItem] if found, otherwise null.
-  FutureOr<CachedItem<V>?> get(K key);
+  FutureOr<CachedItem<V>?> peek(K key);
 
   /// Removes an item from the cache.
   FutureOr<void> remove(K key);
@@ -58,7 +83,7 @@ abstract class CacheStore<K, V> {
   ]) async* {
     now ??= DateTime.now();
     // `get` now handles no-store check
-    CachedItem<V>? cachedItem = await get(key);
+    CachedItem<V>? cachedItem = await peek(key);
 
     if (cachedItem == null) {
       // Item not in cache (or was no-store), fetch, store, and return
@@ -72,7 +97,9 @@ abstract class CacheStore<K, V> {
       return;
     }
 
-    if (!cachedItem.cacheControl.isStale(cachedItem.cachedDate, now)) {
+    final cachedItemCacheControl = cachedItem.responseCacheControl;
+    final cachedItemDate = cachedItem.cachedDate;
+    if (!cachedItemCacheControl.isStale(cachedItemDate, now)) {
       // Item is fresh, return its value
       yield cachedItem.value;
       return;
@@ -80,8 +107,8 @@ abstract class CacheStore<K, V> {
 
     // Item exists in cache and is not no-store
     // Check if stale using its own CacheControl policy
-    if (cachedItem.cacheControl
-        .canServeStaleWhileRevalidate(cachedItem.cachedDate, now)) {
+    if (cachedItemCacheControl.canServeStaleWhileRevalidate(
+        cachedItemDate, now)) {
       // Item is stale but can be served while revalidating.
       // Return the cached value and revalidate in the background.
       yield cachedItem.value;
@@ -96,8 +123,8 @@ abstract class CacheStore<K, V> {
       return;
     } catch (e) {
       // Failed to fetch new value. Check for stale-if-error.
-      final cc = cachedItem.cacheControl;
-      if (cc.canServeStaleIfError(cachedItem.cachedDate, now)) {
+      final cc = cachedItemCacheControl;
+      if (cc.canServeStaleIfError(cachedItemDate, now)) {
         yield cachedItem.value;
         return;
       }

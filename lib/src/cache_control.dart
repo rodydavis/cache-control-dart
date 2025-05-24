@@ -1,6 +1,3 @@
-import 'dart:async';
-import 'store/base.dart';
-
 /// A class for building and parsing `Cache-Control` HTTP headers.
 ///
 /// This class allows you to:
@@ -77,6 +74,12 @@ class CacheControl {
   bool? _mustUnderstandValue;
   bool? _publicValue;
   Duration? _staleWhileRevalidateDuration;
+
+  static CacheControl fromHeaders(Map<String, String> headers) {
+    final ccHeader = headers['Cache-Control'] ?? headers['cache-control'] ?? '';
+    if (ccHeader.isEmpty) return CacheControl();
+    return fromString(ccHeader);
+  }
 
   /// Creates a [CacheControl] from a cache-control header string.
   ///
@@ -623,121 +626,121 @@ class CacheControl {
     return false;
   }
 
-  // Static methods for CacheStore interaction
+  // // Static methods for CacheStore interaction
 
-  /// Writes an item to the provided [CacheStore] using this [CacheControl] policy.
-  ///
-  /// - [store]: The cache store to write to.
-  /// - [key]: The key for the item.
-  /// - [value]: The value of the item.
-  /// - [policy]: The CacheControl policy to associate with this item.
-  /// - [cachedDate]: The date and time when this item is being cached or validated.
-  static FutureOr<void> writeToStore<K, V>(
-    CacheStore<K, V> store,
-    K key,
-    CachedItem<V> value,
-  ) async {
-    if (value.cacheControl.noStore == true) {
-      // Do not store if no-store directive is present.
-      // If the store might be async, ensure removal is also handled appropriately.
-      // For now, assuming remove is also FutureOr.
-      await store.remove(key);
-      return;
-    }
-    await store.set(key, value);
-  }
+  // /// Writes an item to the provided [CacheStore] using this [CacheControl] policy.
+  // ///
+  // /// - [store]: The cache store to write to.
+  // /// - [key]: The key for the item.
+  // /// - [value]: The value of the item.
+  // /// - [policy]: The CacheControl policy to associate with this item.
+  // /// - [cachedDate]: The date and time when this item is being cached or validated.
+  // static FutureOr<void> writeToStore<K, V>(
+  //   CacheStore<K, V> store,
+  //   K key,
+  //   V value,
+  // ) async {
+  //   if (value.cacheControl.noStore == true) {
+  //     // Do not store if no-store directive is present.
+  //     // If the store might be async, ensure removal is also handled appropriately.
+  //     // For now, assuming remove is also FutureOr.
+  //     await store.remove(key);
+  //     return;
+  //   }
+  //   await store.set(key, value);
+  // }
 
-  /// Reads an item from the [CacheStore] if it's considered usable according to its policy.
-  ///
-  /// Returns the value if:
-  /// - The item is fresh and does not require revalidation (e.g., not `no-cache`).
-  /// - The item is stale but can be served via `stale-while-revalidate`.
-  /// - The item is stale, `isErrorCondition` is true, and it can be served via `stale-if-error`.
-  /// Otherwise, returns `null`.
-  ///
-  /// - [store]: The cache store to read from.
-  /// - [key]: The key of the item to retrieve.
-  /// - [now]: The current date and time for freshness calculations.
-  /// - [isErrorCondition]: Flag to indicate if an error condition exists (for `stale-if-error`).
-  static FutureOr<V?> readFromStore<K, V>(
-    CacheStore<K, V> store,
-    K key, {
-    DateTime? now,
-    bool isErrorCondition = false,
-  }) async {
-    now ??= DateTime.now();
-    final cachedItem = await store.get(key);
+  // /// Reads an item from the [CacheStore] if it's considered usable according to its policy.
+  // ///
+  // /// Returns the value if:
+  // /// - The item is fresh and does not require revalidation (e.g., not `no-cache`).
+  // /// - The item is stale but can be served via `stale-while-revalidate`.
+  // /// - The item is stale, `isErrorCondition` is true, and it can be served via `stale-if-error`.
+  // /// Otherwise, returns `null`.
+  // ///
+  // /// - [store]: The cache store to read from.
+  // /// - [key]: The key of the item to retrieve.
+  // /// - [now]: The current date and time for freshness calculations.
+  // /// - [isErrorCondition]: Flag to indicate if an error condition exists (for `stale-if-error`).
+  // static FutureOr<V?> readFromStore<K, V>(
+  //   CacheStore<K, V> store,
+  //   K key, {
+  //   DateTime? now,
+  //   bool isErrorCondition = false,
+  // }) async {
+  //   now ??= DateTime.now();
+  //   final cachedItem = await store.peek(key);
 
-    if (cachedItem == null) {
-      return null;
-    }
+  //   if (cachedItem == null) {
+  //     return null;
+  //   }
 
-    final itemPolicy = cachedItem.cacheControl;
-    final itemCachedDate = cachedItem.cachedDate;
+  //   final itemPolicy = cachedItem.cacheControl;
+  //   final itemCachedDate = cachedItem.cachedDate;
 
-    if (itemPolicy.noStore == true) {
-      // Should not have been stored, or used if it was.
-      return null;
-    }
+  //   if (itemPolicy.noStore == true) {
+  //     // Should not have been stored, or used if it was.
+  //     return null;
+  //   }
 
-    // Check for freshness first
-    if (itemPolicy.isFresh(itemCachedDate, now)) {
-      if (itemPolicy.noCache == true) {
-        // Fresh but requires revalidation (e.g., no-cache directive).
-        // HTTP spec implies it shouldn't be used without revalidation.
-        return null;
-      }
-      // Fresh and usable.
-      return cachedItem.value;
-    } else {
-      // Item is stale, check if it can be served stale
-      if (itemPolicy.canServeStaleWhileRevalidate(itemCachedDate, now)) {
-        // Caller should ideally trigger revalidation in the background.
-        return cachedItem.value;
-      }
-      if (isErrorCondition &&
-          itemPolicy.canServeStaleIfError(itemCachedDate, now)) {
-        return cachedItem.value;
-      }
-      // Stale and cannot be served.
-      return null;
-    }
-  }
+  //   // Check for freshness first
+  //   if (itemPolicy.isFresh(itemCachedDate, now)) {
+  //     if (itemPolicy.noCache == true) {
+  //       // Fresh but requires revalidation (e.g., no-cache directive).
+  //       // HTTP spec implies it shouldn't be used without revalidation.
+  //       return null;
+  //     }
+  //     // Fresh and usable.
+  //     return cachedItem.value;
+  //   } else {
+  //     // Item is stale, check if it can be served stale
+  //     if (itemPolicy.canServeStaleWhileRevalidate(itemCachedDate, now)) {
+  //       // Caller should ideally trigger revalidation in the background.
+  //       return cachedItem.value;
+  //     }
+  //     if (isErrorCondition &&
+  //         itemPolicy.canServeStaleIfError(itemCachedDate, now)) {
+  //       return cachedItem.value;
+  //     }
+  //     // Stale and cannot be served.
+  //     return null;
+  //   }
+  // }
 
-  /// Checks if an item in the [CacheStore] is stale.
-  ///
-  /// - [store]: The cache store to check.
-  /// - [key]: The key of the item.
-  /// - [now]: The current date and time for freshness calculations.
-  /// Returns `true` if stale, `false` if fresh, `null` if not found or `no-store`.
-  static FutureOr<bool?> isItemStaleInStore<K, V>(
-    CacheStore<K, V> store,
-    K key,
-    DateTime now,
-  ) async {
-    final cachedItem = await store.get(key);
-    if (cachedItem == null || cachedItem.cacheControl.noStore == true) {
-      return null;
-    }
-    return cachedItem.cacheControl.isStale(cachedItem.cachedDate, now);
-  }
+  // /// Checks if an item in the [CacheStore] is stale.
+  // ///
+  // /// - [store]: The cache store to check.
+  // /// - [key]: The key of the item.
+  // /// - [now]: The current date and time for freshness calculations.
+  // /// Returns `true` if stale, `false` if fresh, `null` if not found or `no-store`.
+  // static FutureOr<bool?> isItemStaleInStore<K, V>(
+  //   CacheStore<K, V> store,
+  //   K key,
+  //   DateTime now,
+  // ) async {
+  //   final cachedItem = await store.peek(key);
+  //   if (cachedItem == null || cachedItem.cacheControl.noStore == true) {
+  //     return null;
+  //   }
+  //   return cachedItem.cacheControl.isStale(cachedItem.cachedDate, now);
+  // }
 
-  /// Checks if an item in the [CacheStore] needs to be updated (revalidated).
-  ///
-  /// - [store]: The cache store to check.
-  /// - [key]: The key of the item.
-  /// - [now]: The current date and time for freshness calculations.
-  /// Returns `true` if revalidation is needed, `false` otherwise, `null` if not found or `no-store`.
-  static FutureOr<bool?> needsItemUpdateInStore<K, V>(
-    CacheStore<K, V> store,
-    K key,
-    DateTime now,
-  ) async {
-    final cachedItem = await store.get(key);
-    if (cachedItem == null || cachedItem.cacheControl.noStore == true) {
-      return null;
-    }
-    return cachedItem.cacheControl
-        .needsRevalidation(cachedItem.cachedDate, now);
-  }
+  // /// Checks if an item in the [CacheStore] needs to be updated (revalidated).
+  // ///
+  // /// - [store]: The cache store to check.
+  // /// - [key]: The key of the item.
+  // /// - [now]: The current date and time for freshness calculations.
+  // /// Returns `true` if revalidation is needed, `false` otherwise, `null` if not found or `no-store`.
+  // static FutureOr<bool?> needsItemUpdateInStore<K, V>(
+  //   CacheStore<K, V> store,
+  //   K key,
+  //   DateTime now,
+  // ) async {
+  //   final cachedItem = await store.peek(key);
+  //   if (cachedItem == null || cachedItem.cacheControl.noStore == true) {
+  //     return null;
+  //   }
+  //   return cachedItem.cacheControl
+  //       .needsRevalidation(cachedItem.cachedDate, now);
+  // }
 }
