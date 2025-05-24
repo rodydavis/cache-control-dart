@@ -208,7 +208,7 @@ void main() async {
       ..staleWhileRevalidate = const Duration(days: 1); // Allow serving stale for 1 day while revalidating
 
     return shelf.Response.ok(
-      '{\"message\": \"This is some private, cachable data.\"}\',
+      '{\"message\": \"This is some private, cachable data.\"}',
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': resourceCacheControl.build(),
